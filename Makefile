@@ -13,7 +13,8 @@ $(BIN) : $(OBJS)
 	$(CC) -o $@ -c $< $(CFLAGS) $(EXTRA_CFLAGS)
 
 clean:
-	-@rm -fr $(TARGET) $(OBJS)
+	-@rm -fr $(BIN) $(OBJS)
 
 display:
 	@echo OBJS: $(OBJS)
+	@echo TARGET: $(BIN)
