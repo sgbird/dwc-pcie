@@ -279,6 +279,16 @@ enum dw_pcie_device_mode {
 	DW_PCIE_RC_TYPE,
 };
 
+enum dw_pcie_access_type {
+    DW_PCIE_CDM,
+    DW_PCIE_SHADOW,
+    DW_PCIE_ELBI,
+    DW_PCIE_ATU,
+    DW_PCIE_DMA,
+    DW_PCIE_MSI_TABLE,
+    DW_PCIE_MSI_PBA
+};
+
 struct pci_bus {
 	//struct list_head node;		/* Node in list of buses */
 	//struct pci_bus	*parent;	/* Parent bus this bridge is on */
@@ -370,14 +380,10 @@ enum dw_pcie_as_type {
 
 struct dw_pcie_ops {
 	uint64_t	(*cpu_addr_fixup)(struct dw_pcie *pcie, uint64_t cpu_addr);
-	uint32_t	(*read_dbi)(struct dw_pcie *pcie, void  *base, uint32_t reg,
-			    size_t size);
-	void	(*write_dbi)(struct dw_pcie *pcie, void  *base, uint32_t reg,
-			     size_t size, uint32_t val);
-	uint32_t     (*read_dbi2)(struct dw_pcie *pcie, void  *base, uint32_t reg,
-			     size_t size);
-	void    (*write_dbi2)(struct dw_pcie *pcie, void  *base, uint32_t reg,
-			      size_t size, uint32_t val);
+	uint32_t	(*read_dbi)(struct dw_pcie *pcie, enum dw_pcie_access_type type,
+                    uint32_t reg, size_t size);
+	void	(*write_dbi)(struct dw_pcie *pcie, enum dw_pcie_access_type type,
+                    uint32_t reg, size_t size, uint32_t val);
 	int	(*link_up)(struct dw_pcie *pcie);
 	int	(*start_link)(struct dw_pcie *pcie);
 	void	(*stop_link)(struct dw_pcie *pcie);
@@ -413,7 +419,7 @@ void dw_pcie_write_dbi(struct dw_pcie *pci, uint32_t reg, size_t size, uint32_t 
 uint32_t dw_pcie_read_dbi2(struct dw_pcie *pci, uint32_t reg, size_t size);
 void dw_pcie_write_dbi2(struct dw_pcie *pci, uint32_t reg, size_t size, uint32_t val);
 uint32_t dw_pcie_read_atu(struct dw_pcie *pci, uint32_t reg, size_t size);
-void dw_pcie_write_atu(struct dw_pcie *pci, uint32_t reg, size_t size, uint32_t val);
+void dw_pcie_write_atu(struct dw_pcie *pci, enum dw_pcie_region_type region, uint32_t index,  uint32_t reg, size_t size, uint32_t val);
 int dw_pcie_link_up(struct dw_pcie *pci);
 int dw_pcie_wait_for_link(struct dw_pcie *pci);
 void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
@@ -424,46 +430,6 @@ int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
 void dw_pcie_disable_atu(struct dw_pcie *pci, int index,
 			 enum dw_pcie_region_type type);
 void dw_pcie_setup(struct dw_pcie *pci);
-
-static inline void dw_pcie_writel_dbi(struct dw_pcie *pci, uint32_t reg, uint32_t val)
-{
-	dw_pcie_write_dbi(pci, reg, 0x4, val);
-}
-
-static inline uint32_t dw_pcie_readl_dbi(struct dw_pcie *pci, uint32_t reg)
-{
-	return dw_pcie_read_dbi(pci, reg, 0x4);
-}
-
-static inline void dw_pcie_writew_dbi(struct dw_pcie *pci, uint32_t reg, uint16_t val)
-{
-	dw_pcie_write_dbi(pci, reg, 0x2, val);
-}
-
-static inline uint16_t dw_pcie_readw_dbi(struct dw_pcie *pci, uint32_t reg)
-{
-	return dw_pcie_read_dbi(pci, reg, 0x2);
-}
-
-static inline void dw_pcie_writeb_dbi(struct dw_pcie *pci, uint32_t reg, uint8_t val)
-{
-	dw_pcie_write_dbi(pci, reg, 0x1, val);
-}
-
-static inline uint8_t dw_pcie_readb_dbi(struct dw_pcie *pci, uint32_t reg)
-{
-	return dw_pcie_read_dbi(pci, reg, 0x1);
-}
-
-static inline void dw_pcie_writel_dbi2(struct dw_pcie *pci, uint32_t reg, uint32_t val)
-{
-	dw_pcie_write_dbi2(pci, reg, 0x4, val);
-}
-
-static inline uint32_t dw_pcie_readl_dbi2(struct dw_pcie *pci, uint32_t reg)
-{
-	return dw_pcie_read_dbi2(pci, reg, 0x4);
-}
 
 static inline void dw_pcie_writel_atu(struct dw_pcie *pci, uint32_t reg, uint32_t val)
 {
