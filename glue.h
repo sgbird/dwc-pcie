@@ -2,6 +2,8 @@
 #define __GLUE_H__
 
 #include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
 
 typedef unsigned long size_t;
 

@@ -2,9 +2,10 @@
 
 int main (int argc, char *argv[])
 {
-    struct dw_pcie pci;
+    //struct dw_pcie pci;
 
-    pcie_init(&pci);
+    //pcie_init(&pci);
+    init_duowen_pcie_subsystem();
 
     return 0;
 }

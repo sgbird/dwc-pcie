@@ -16,13 +16,17 @@
 #define LINK_WAIT_IATU			9
 
 /* Synopsys-specific PCIe configuration registers */
+#define PCIE_PORT_FORCE_OFF     0x708
+#define PORT_LINK_NUM_MASK      GENMASK(7, 0)
+#define PORT_LINK_NUM(n)        FIELD_PREP(PORT_LINK_NUM_MASK, n)
+
 #define PCIE_PORT_LINK_CONTROL		0x710
 #define PORT_LINK_MODE_MASK		GENMASK(21, 16)
 #define PORT_LINK_MODE(n)		FIELD_PREP(PORT_LINK_MODE_MASK, n)
-#define PORT_LINK_MODE_1_LANES		PORT_LINK_MODE(0x1)
-#define PORT_LINK_MODE_2_LANES		PORT_LINK_MODE(0x3)
 #define PORT_LINK_MODE_4_LANES		PORT_LINK_MODE(0x7)
 #define PORT_LINK_MODE_8_LANES		PORT_LINK_MODE(0xf)
+#define PORT_LINK_MODE_16_LANES		PORT_LINK_MODE(0x1f)
+#define PCIE_TIMER_CTRL_MAX_FUN_NUM_OFF 0x718
 
 #define PCIE_PORT_DEBUG0		0x728
 #define PORT_LOGIC_LTSSM_STATE_MASK	0x1f
@@ -35,10 +39,13 @@
 #define PORT_LOGIC_SPEED_CHANGE		BIT(17)
 #define PORT_LOGIC_LINK_WIDTH_MASK	GENMASK(12, 8)
 #define PORT_LOGIC_LINK_WIDTH(n)	FIELD_PREP(PORT_LOGIC_LINK_WIDTH_MASK, n)
-#define PORT_LOGIC_LINK_WIDTH_1_LANES	PORT_LOGIC_LINK_WIDTH(0x1)
-#define PORT_LOGIC_LINK_WIDTH_2_LANES	PORT_LOGIC_LINK_WIDTH(0x2)
 #define PORT_LOGIC_LINK_WIDTH_4_LANES	PORT_LOGIC_LINK_WIDTH(0x4)
 #define PORT_LOGIC_LINK_WIDTH_8_LANES	PORT_LOGIC_LINK_WIDTH(0x8)
+#define PORT_LOGIC_LINK_WIDTH_16_LANES	PORT_LOGIC_LINK_WIDTH(0xf)
+
+#define PCIE_GEN3_RELATED_OFF   0x890
+#define RATE_SHADOW_SEL_MASK    GENMASK(25, 24)
+#define RATE_SHADOW_SEL(n)      FIELD_PREP(RATE_SHADOW_SEL_MASK, n)
 
 #define PCIE_MSI_ADDR_LO		0x820
 #define PCIE_MSI_ADDR_HI		0x824
@@ -68,6 +75,16 @@
 #define PCIE_ATU_DEV(x)			FIELD_PREP(GENMASK(23, 19), x)
 #define PCIE_ATU_FUNC(x)		FIELD_PREP(GENMASK(18, 16), x)
 #define PCIE_ATU_UPPER_TARGET		0x91C
+
+#define PCIE_IATU_REGION_CTRL1_OFF_OUTBOUND         0x0
+#define PCIE_IATU_REGION_CTRL2_OFF_OUTBOUND         0x4
+#define PCIE_IATU_LWR_BASE_ADDR_OFF_OUTBOUND        0x8
+#define PCIE_IATU_UPPER_BASE_ADDR_OFF_OUTBOUND      0xC
+#define PCIE_IATU_LWR_LIMIT_ADDR_OFF_OUTBOUND       0x10
+#define PCIE_IATU_LWR_TARGET_ADDR_OFF_OUTBOUND      0x14
+#define PCIE_IATU_UPPER_TARGET_ADDR_OFF_OUTBOUND    0x18
+#define PCIE_IATU_REGION_CTRL3_OFF_OUTBOUND         0x1c
+#define PCIE_IATU_UPPER_LIMIT_ADDR_OFF_OUTBOUND     0x20
 
 #define PCIE_MISC_CONTROL_1_OFF		0x8BC
 #define PCIE_DBI_RO_WR_EN		BIT(0)
@@ -391,8 +408,10 @@ struct dw_pcie_ops {
 
 struct dw_pcie {
 	struct device		*dev;
-	void 		*dbi_base;
-	void 		*dbi_base2;
+	uint64_t 	dbi_base;
+    uint32_t    lane_num;
+    uint8_t     axi_dbi_port;
+    uint8_t     order;
 	/* Used when iatu_unroll_enabled is true */
 	void 		*atu_base;
 	uint32_t			num_viewport;
@@ -400,6 +419,7 @@ struct dw_pcie {
 	struct pcie_port	pp;
 	//struct dw_pcie_ep	ep;
 	const struct dw_pcie_ops *ops;
+    bool        active;
 	unsigned int		version;
 };
 
@@ -414,11 +434,11 @@ uint16_t dw_pcie_find_ext_capability(struct dw_pcie *pci, uint8_t cap);
 int dw_pcie_read(void  *addr, int size, uint32_t *val);
 int dw_pcie_write(void  *addr, int size, uint32_t val);
 
-uint32_t dw_pcie_read_dbi(struct dw_pcie *pci, uint32_t reg, size_t size);
-void dw_pcie_write_dbi(struct dw_pcie *pci, uint32_t reg, size_t size, uint32_t val);
+uint32_t dw_pcie_read_dbi(struct dw_pcie *pci, enum dw_pcie_access_type type, uint32_t reg, size_t size);
+void dw_pcie_write_dbi(struct dw_pcie *pci, enum dw_pcie_access_type type, uint32_t reg, uint32_t val, size_t size);
 uint32_t dw_pcie_read_dbi2(struct dw_pcie *pci, uint32_t reg, size_t size);
 void dw_pcie_write_dbi2(struct dw_pcie *pci, uint32_t reg, size_t size, uint32_t val);
-uint32_t dw_pcie_read_atu(struct dw_pcie *pci, uint32_t reg, size_t size);
+uint32_t dw_pcie_read_atu(struct dw_pcie *pci, enum dw_pcie_region_type region, uint32_t index,  uint32_t reg, size_t size);
 void dw_pcie_write_atu(struct dw_pcie *pci, enum dw_pcie_region_type region, uint32_t index,  uint32_t reg, size_t size, uint32_t val);
 int dw_pcie_link_up(struct dw_pcie *pci);
 int dw_pcie_wait_for_link(struct dw_pcie *pci);
@@ -431,14 +451,14 @@ void dw_pcie_disable_atu(struct dw_pcie *pci, int index,
 			 enum dw_pcie_region_type type);
 void dw_pcie_setup(struct dw_pcie *pci);
 
-static inline void dw_pcie_writel_atu(struct dw_pcie *pci, uint32_t reg, uint32_t val)
-{
-	dw_pcie_write_atu(pci, reg, 0x4, val);
-}
+//static inline void dw_pcie_writel_atu(struct dw_pcie *pci, uint32_t reg, uint32_t val)
+//{
+//	dw_pcie_write_atu(pci, reg, 0x4, val);
+//}
 
 static inline uint32_t dw_pcie_readl_atu(struct dw_pcie *pci, uint32_t reg)
 {
-	return dw_pcie_read_atu(pci, reg, 0x4);
+	//return dw_pcie_read_atu(pci, reg, 0x4);
 }
 
 static inline void dw_pcie_dbi_ro_wr_en(struct dw_pcie *pci)
@@ -447,9 +467,9 @@ static inline void dw_pcie_dbi_ro_wr_en(struct dw_pcie *pci)
 	uint32_t val;
 
 	reg = PCIE_MISC_CONTROL_1_OFF;
-	val = dw_pcie_readl_dbi(pci, reg);
+	val = dw_pcie_read_dbi(pci, DW_PCIE_CDM, reg, 0x4);
 	val |= PCIE_DBI_RO_WR_EN;
-	dw_pcie_writel_dbi(pci, reg, val);
+	dw_pcie_write_dbi(pci, DW_PCIE_CDM, reg, val, 0x4);
 }
 
 static inline void dw_pcie_dbi_ro_wr_dis(struct dw_pcie *pci)
@@ -458,9 +478,9 @@ static inline void dw_pcie_dbi_ro_wr_dis(struct dw_pcie *pci)
 	uint32_t val;
 
 	reg = PCIE_MISC_CONTROL_1_OFF;
-	val = dw_pcie_readl_dbi(pci, reg);
+	val = dw_pcie_read_dbi(pci, DW_PCIE_CDM, reg, 0x4);
 	val &= ~PCIE_DBI_RO_WR_EN;
-	dw_pcie_writel_dbi(pci, reg, val);
+	dw_pcie_write_dbi(pci, DW_PCIE_CDM, reg, val, 0x4);
 }
 
 void dw_pcie_msi_init(struct pcie_port *pp);
