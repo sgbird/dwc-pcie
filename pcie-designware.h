@@ -41,7 +41,7 @@
 #define PORT_LOGIC_LINK_WIDTH(n)	FIELD_PREP(PORT_LOGIC_LINK_WIDTH_MASK, n)
 #define PORT_LOGIC_LINK_WIDTH_4_LANES	PORT_LOGIC_LINK_WIDTH(0x4)
 #define PORT_LOGIC_LINK_WIDTH_8_LANES	PORT_LOGIC_LINK_WIDTH(0x8)
-#define PORT_LOGIC_LINK_WIDTH_16_LANES	PORT_LOGIC_LINK_WIDTH(0xf)
+#define PORT_LOGIC_LINK_WIDTH_16_LANES	PORT_LOGIC_LINK_WIDTH(0x10)
 
 #define PCIE_GEN3_RELATED_OFF   0x890
 #define RATE_SHADOW_SEL_MASK    GENMASK(25, 24)
@@ -357,19 +357,20 @@ struct dw_pcie_host_ops {
 };
 
 struct pcie_port {
-	uint8_t			root_bus_nr;
-	uint64_t			cfg0_base;
-	void 		*va_cfg0_base;
-	uint32_t			cfg0_size;
-	uint64_t			cfg1_base;
-	void 		*va_cfg1_base;
-	uint32_t			cfg1_size;
+	uint8_t			primary_bus_nr;
+    uint8_t         second_bus_nr;
+    uint8_t         sub_bus_nr;
+	uint64_t		cfg_bar0;
+	uint64_t		cfg_bar1;
+	uint64_t		cfg_size;
 	uint64_t		io_base;
-	uint64_t		io_bus_addr;
-	uint32_t			io_size;
-	uint64_t			mem_base;
-	uint64_t		mem_bus_addr;
-	uint32_t			mem_size;
+	uint64_t		io_size;
+	uint64_t		mem_base;
+	uint64_t		mem_size;
+    uint64_t        prefetch_base;
+    uint64_t        prefetch_size;
+    struct list_head        *pcie_dev; // In resource decrease order
+    struct list_head        *pcie_bridge; 
 	//struct resource		*cfg;
 	//struct resource		*io;
 	//struct resource		*mem;
@@ -409,6 +410,12 @@ struct dw_pcie_ops {
 struct dw_pcie {
 	struct device		*dev;
 	uint64_t 	dbi_base;
+    uint64_t    mem32_base;
+    uint64_t    mem32_size;
+    uint64_t    mem64_base;
+    uint64_t    mem64_size;
+    uint64_t    io_base;
+    uint64_t    io_size;
     uint32_t    lane_num;
     uint8_t     axi_dbi_port;
     uint8_t     order;
@@ -444,7 +451,7 @@ int dw_pcie_link_up(struct dw_pcie *pci);
 int dw_pcie_wait_for_link(struct dw_pcie *pci);
 void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
 			       int type, uint64_t cpu_addr, uint64_t pci_addr,
-			       uint32_t size);
+			       uint64_t size);
 int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
 			     uint64_t cpu_addr, enum dw_pcie_as_type as_type);
 void dw_pcie_disable_atu(struct dw_pcie *pci, int index,

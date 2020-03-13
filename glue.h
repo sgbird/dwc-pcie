@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include "list.h"
 
 typedef unsigned long size_t;
 
@@ -17,7 +18,7 @@ typedef unsigned long size_t;
 #define BIT_ULL_MASK(nr)	(ULL(1) << ((nr) % BITS_PER_LONG_LONG))
 #define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
 #define BITS_PER_BYTE		8
-#define BITS_PER_LONG       32
+#define BITS_PER_LONG       64
 #define BITS_PER_LONG_LONG  64
 
 #define IS_ALIGNED(x, a)    ((x & (typeof(x))(a - 1)) == 0) 

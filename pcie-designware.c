@@ -5,55 +5,72 @@
 
 #ifdef TEST
 static uint32_t readl(uint64_t addr){return 0;}
-
-static void writel(uint64_t addr, uint32_t val){}
+static void writel(uint64_t addr, uint32_t val)
+{
+    printf("AXIWrite: Addr: 0x%llx, Data: 0x%x\n", addr, val);
+}
+void udelay(uint32_t time){}
 #endif
 
+#ifdef IPBENCH
+void axi_read_c(uint64_t addr, uint32_t *data, int port);
+void axi_write_c(uint64_t addr, uint32_t data, int port);
+#else
 uint32_t axi_read_c(uint64_t addr, uint8_t port)
 {
     return 0;
 }
 
-void axi_write_c(uint64_t addr, uint64_t val, uint8_t port)
+void axi_write_c(uint64_t addr, uint32_t val, uint8_t port)
 {
     printf("WriteAXI: addr: 0x%08x, data: 0x%08x, port: %d\n", addr, val, port);
 }
+#endif
 
-static uint32_t format_dbi_addr(enum dw_pcie_access_type type, uint32_t reg)
+
+static uint64_t format_dbi_addr(enum dw_pcie_access_type type, uint32_t reg)
 {
-    uint32_t route, addr;
+    //uint64_t route0, route1, addr;
+    uint32_t route1, addr;
 
     //assert(reg & 0x3 == 0);
  
     switch (type) {
     case DW_PCIE_CDM:
-        route = 0;
+        //route0 = 0;
+        route1 = 0;
         break;
     case DW_PCIE_SHADOW:
-        route = 1;
+        //route0 = 1;
+        route1 = 1;
         break;
     case DW_PCIE_ATU:
-        route = 2;
+        //route0 = 3;
+        route1 = 2;
         break;
     case DW_PCIE_DMA:
-        route = 3;
+        //route0 = 3;
+        route1 = 3;
         break;
     default:
         dev_err(pci->dev, "Other types is not supported\n");
         return 0xffffffff;
     }
 
-    addr = (route << 17) | reg;
+    //addr = (route0 << 31) | (route1 << 17) | (uint64_t)reg;
+    addr = (route1 << 17) | reg;
     return addr;
 }
 
 static uint32_t read_dbi(struct dw_pcie *pci, enum dw_pcie_access_type type, uint32_t reg)
 {
-    uint32_t val, dbi_offset;
-#ifdef IPBENCH
-    val = axi_read_c((pci->dbi_base + dbi_offset), pci->axi_dbi_port);
-#else
+    uint32_t val;
+    uint64_t dbi_offset;
+    
     dbi_offset = format_dbi_addr(type, reg);
+#ifdef IPBENCH
+    axi_read_c((pci->dbi_base + dbi_offset), &val, pci->axi_dbi_port);
+#else
     val = readl(pci->dbi_base + dbi_offset);
 #endif
 
@@ -113,7 +130,7 @@ uint32_t dw_pcie_read_dbi(struct dw_pcie *pci, enum dw_pcie_access_type type, ui
 
 static void write_dbi(struct dw_pcie *pci, enum dw_pcie_access_type type, uint32_t reg, uint32_t val)
 {
-    uint32_t dbi_offset;
+    uint64_t dbi_offset;
 
     dbi_offset = format_dbi_addr(type, reg);
 
@@ -217,7 +234,7 @@ void dw_pcie_write_atu(struct dw_pcie *pci, enum dw_pcie_region_type region,
     }
 
     addr = ((index << 9) | (dir << 8) | reg);
-    dw_pcie_write_dbi(pci, acc_type, addr, size, val);
+    dw_pcie_write_dbi(pci, acc_type, addr, val, size);
 }
 
 /*
@@ -278,7 +295,7 @@ static void dw_pcie_prog_outbound_atu_unroll(struct dw_pcie *pci, int index,
 */
 
 void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
-			       uint64_t cpu_addr, uint64_t pci_addr, uint32_t size)
+			       uint64_t cpu_addr, uint64_t pci_addr, uint64_t size)
 {
 	//uint32_t retries, val;
 
@@ -462,25 +479,25 @@ void dw_pcie_disable_atu(struct dw_pcie *pci, int index,
 }
 */
 
-static int dw_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
+static void dw_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
 			       uint32_t *val)
 {
 	struct dw_pcie *pci;
 
-	if (pp->ops->rd_own_conf)
-		return pp->ops->rd_own_conf(pp, where, size, val);
+	//if (pp->ops->rd_own_conf)
+	//	return pp->ops->rd_own_conf(pp, where, size, val);
 
 	pci = to_dw_pcie_from_pp(pp);
-	return dw_pcie_read_dbi(pci, DW_PCIE_CDM, where, size);
+	*val = dw_pcie_read_dbi(pci, DW_PCIE_CDM, where, size);
 }
 
-static int dw_pcie_wr_own_conf(struct pcie_port *pp, int where, int size,
+static void dw_pcie_wr_own_conf(struct pcie_port *pp, int where, int size,
 			       uint32_t val)
 {
 	struct dw_pcie *pci;
 
-	if (pp->ops->wr_own_conf)
-		return pp->ops->wr_own_conf(pp, where, size, val);
+	//if (pp->ops->wr_own_conf)
+	//	return pp->ops->wr_own_conf(pp, where, size, val);
 
 	pci = to_dw_pcie_from_pp(pp);
 	dw_pcie_write_dbi(pci, DW_PCIE_CDM, where, val, size);
@@ -565,6 +582,8 @@ void dw_pcie_setup(struct dw_pcie *pci)
 		//dev_err(pci->dev, "num-lanes %u: invalid value\n", lanes);
 		//return;
 	}
+
+    val |= BIT(7); // set fast link mode
 	dw_pcie_write_dbi(pci, DW_PCIE_CDM, PCIE_PORT_LINK_CONTROL, val, 0x4);
 
 	/* Set link width speed control register */
@@ -584,7 +603,7 @@ void dw_pcie_setup(struct dw_pcie *pci)
 	dw_pcie_write_dbi(pci, DW_PCIE_CDM, PCIE_LINK_WIDTH_SPEED_CONTROL, val, 0x4);
 
 	val = dw_pcie_read_dbi(pci, DW_PCIE_CDM, PCIE_PORT_FORCE_OFF, 0x4);
-    val &= ~PORT_LINK_MODE_MASK;
+    val &= ~PORT_LINK_NUM_MASK;
     val |= PORT_LINK_NUM(order);
     dw_pcie_write_dbi(pci, DW_PCIE_CDM, PCIE_PORT_FORCE_OFF, val, 0x4);
 
@@ -663,6 +682,11 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
 						  pp->io_bus_addr, pp->io_size);
 	}
 */
+
+    //dw_pcie_prog_outbound_atu(pci, 0, PCIE_ATU_TYPE_IO, 0xd000000080001000, 0x1a00000000120000, 0x80ff0000);
+    dw_pcie_prog_outbound_atu(pci, 0, PCIE_ATU_TYPE_CFG1, pp->cfg_bar1, 0x1000000000000000, 0x80000);
+    dw_pcie_prog_outbound_atu(pci, 1, PCIE_ATU_TYPE_CFG0, pp->cfg_bar0, 0x1100000000000000, 0x80000);
+    dw_pcie_prog_outbound_atu(pci, 2, PCIE_ATU_TYPE_MEM, pp->mem_base, 0x2000000000000000, pp->mem_size);
 	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
 
 	/* Program correct class for RC */
