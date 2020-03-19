@@ -1,15 +1,7 @@
-#include <stdio.h>
-#include "pcie-designware.h"
-#include "glue.h"
-#include "cfg.h"
-
-#ifdef TEST
-static uint32_t readl(uint64_t addr){return 0;}
-static void writel(uint64_t addr, uint32_t val)
-{
-    printf("AXIWrite: Addr: 0x%llx, Data: 0x%x\n", addr, val);
-}
-void udelay(uint32_t time){}
+#ifdef SDFIRM
+#include <driver/pcie_designware.h>
+#else
+#include "pcie_designware.h"
 #endif
 
 #ifdef IPBENCH
@@ -137,6 +129,7 @@ static void write_dbi(struct dw_pcie *pci, enum dw_pcie_access_type type, uint32
 #ifdef IPBENCH
     axi_write_c(pci->dbi_base + dbi_offset, val, pci->axi_dbi_port);
 #else
+    printf("AXIWrite: Addr: 0x%llx, Data: 0x%x\n", pci->dbi_base + dbi_offset, val);
     writel(pci->dbi_base + dbi_offset, val);
 #endif
 
@@ -190,6 +183,7 @@ void dw_pcie_write_dbi(struct dw_pcie *pci, enum dw_pcie_access_type type, uint3
 uint32_t dw_pcie_read_atu(struct dw_pcie *pci, enum dw_pcie_region_type region, uint32_t index, uint32_t reg, size_t size)
 {
 	uint32_t addr, dir;
+    enum dw_pcie_access_type acc_type = DW_PCIE_ATU;
 
     switch (region) {
     case DW_PCIE_REGION_INBOUND:
@@ -200,19 +194,11 @@ uint32_t dw_pcie_read_atu(struct dw_pcie *pci, enum dw_pcie_region_type region, 
         break;
     default:
         dev_err(pci->dev, "Wrong Inbound/Outbound input\n");
-        return;
+        return -1;
     }
 
     addr = ((index << 9) | (dir << 8) | reg);
-	if (pci->ops->read_dbi)
-		return pci->ops->read_dbi(pci, DW_PCIE_ATU, reg, size);
-/*
-	ret = dw_pcie_read(pci->atu_base + reg, size, &val);
-	if (ret)
-		dev_err(pci->dev, "Read ATU address failed\n");
-
-	return val;
-*/
+    return dw_pcie_read_dbi(pci, acc_type, addr, size);
 }
 
 void dw_pcie_write_atu(struct dw_pcie *pci, enum dw_pcie_region_type region,
@@ -552,11 +538,9 @@ int post_platform_init(struct dw_pcie *pci)
 */
 void dw_pcie_setup(struct dw_pcie *pci)
 {
-	int ret;
 	uint32_t val, tmp;
 	uint32_t lanes = pci->lane_num;
     uint8_t order = pci->order;
-	struct device *dev = pci->dev;
 
     /* Conifg Fast Link Scale Factor is 64(16us) */
     val = dw_pcie_read_dbi(pci, DW_PCIE_CDM, PCIE_TIMER_CTRL_MAX_FUN_NUM_OFF, 0x4);
@@ -636,7 +620,7 @@ void dw_pcie_setup(struct dw_pcie *pci)
 
 void dw_pcie_setup_rc(struct pcie_port *pp)
 {
-	uint32_t val, ctrl, num_ctrls;
+	uint32_t val;
 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
 
     dw_pcie_dbi_ro_wr_en(pci);
@@ -711,13 +695,13 @@ int pre_platform_init(void)
 
 int dw_pcie_host_init(struct pcie_port *pp)
 {
-	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+	//struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
 
-    pre_platform_init();//qcom_pcie_init_2_3_3
+    pre_platform_init();// pcie_init_2_3_3
 
     dw_pcie_setup_rc(pp);
 
-    //post_platform_init(pci); //qcom_pcie_establish_link
+    //post_platform_init(pci); // pcie_establish_link
 
     return 0;
 }
