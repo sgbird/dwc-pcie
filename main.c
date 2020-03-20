@@ -1,11 +1,11 @@
-#include "pcie-designware.h"
+#include "pcie_designware.h"
 
 int main (int argc, char *argv[])
 {
     //struct dw_pcie pci;
 
     //pcie_init(&pci);
-    init_duowen_pcie_subsystem();
+	pci_platform_init();
 
     return 0;
 }

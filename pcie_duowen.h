@@ -1,4 +1,8 @@
-#include "pcie-designware.h"
+#ifdef SDFIRM
+#include <driver/pcie_designware.h>
+#else
+#include "pcie_designware.h"
+#endif
 
 #define X16         0
 #define X8          1
@@ -99,7 +103,6 @@
 #ifdef IPBENCH
 void apb_read_c(uint32_t addr, uint32_t *data, int port);
 void apb_write_c(uint32_t addr, uint32_t data, int port);
-void udelay(uint32_t time);
 #endif
 
 void init_duowen_pcie_subsystem(void);

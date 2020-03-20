@@ -1,11 +1,5 @@
 #include "pcie_duowen.h"
 
-#ifdef TEST
-void writel(uint32_t addr, uint32_t data){}
-uint32_t readl(uint32_t addr){}
-#endif
-
-
 struct duowen_pcie_subsystem pcie_subsystem;
 
 struct dw_pcie controllers[] = 
@@ -132,7 +126,23 @@ static void subsys_link_init_pre(struct duowen_pcie_subsystem *pcie_subsystem)
     //assert(link_mode != LINK_MODE_INVALID);
 
     switch (link_mode) {
-    case LINK_MODE_4_4_4_4:
+    case LINK_MODE_4_4_4_4:     // 0: In DPU, X4_0
+#ifdef DPU
+        (controller + X16)->lane_num = 0;
+        (controller + X8)->lane_num = 0;
+        (controller + X4_0)->lane_num = 4;
+        (controller + X4_1)->lane_num = 0;
+
+        (controller + X16)->active = false;
+        (controller + X8)->active = false;
+        (controller + X4_0)->active = true;
+        (controller + X4_1)->active = false;
+
+        (controller + X16)->order = 0xff;
+        (controller + X8)->order = 0xff;
+        (controller + X4_0)->order = 0;
+        (controller + X4_1)->order = 0xff;
+#else
         (controller + X16)->lane_num = 4;
         (controller + X8)->lane_num = 4;
         (controller + X4_0)->lane_num = 4;
@@ -147,8 +157,25 @@ static void subsys_link_init_pre(struct duowen_pcie_subsystem *pcie_subsystem)
         (controller + X8)->order = 1;
         (controller + X4_0)->order = 2;
         (controller + X4_1)->order = 3;
+#endif
         break;
-    case LINK_MODE_8_4_0_4:
+    case LINK_MODE_8_4_0_4:     // 1: In DPU, X4_1
+#ifdef DPU
+        (controller + X16)->lane_num = 0;
+        (controller + X8)->lane_num = 0;
+        (controller + X4_0)->lane_num = 0;
+        (controller + X4_1)->lane_num = 4;
+
+        (controller + X16)->active = false;
+        (controller + X8)->active = false;
+        (controller + X4_0)->active = false;
+        (controller + X4_1)->active = true;
+
+        (controller + X16)->order = 0xff;
+        (controller + X8)->order = 0xff;
+        (controller + X4_0)->order = 0xff;
+        (controller + X4_1)->order = 0;
+#else
         (controller + X16)->lane_num = 8;
         (controller + X8)->lane_num = 4;
         (controller + X4_0)->lane_num = 0;
@@ -164,7 +191,24 @@ static void subsys_link_init_pre(struct duowen_pcie_subsystem *pcie_subsystem)
         (controller + X4_0)->order = 0xff;
         (controller + X4_1)->order = 2;
         break;
-    case LINK_MODE_8_8_0_0:
+#endif
+    case LINK_MODE_8_8_0_0:     // 2: In DPU, X8
+#ifdef DPU
+        (controller + X16)->lane_num = 0;
+        (controller + X8)->lane_num = 4;
+        (controller + X4_0)->lane_num = 0;
+        (controller + X4_1)->lane_num = 0;
+
+        (controller + X16)->active = false;
+        (controller + X8)->active = true;
+        (controller + X4_0)->active = false;
+        (controller + X4_1)->active = false;
+
+        (controller + X16)->order = 0xff;
+        (controller + X8)->order = 0;
+        (controller + X4_0)->order = 0xff;
+        (controller + X4_1)->order = 0xff;
+#else
         (controller + X16)->lane_num = 8;
         (controller + X8)->lane_num = 8;
         (controller + X4_0)->lane_num = 0;
@@ -179,8 +223,25 @@ static void subsys_link_init_pre(struct duowen_pcie_subsystem *pcie_subsystem)
         (controller + X8)->order = 1;
         (controller + X4_0)->order = 0xff;
         (controller + X4_1)->order = 0xff;
+#endif
         break;
-    case LINK_MODE_16_0_0_0:
+    case LINK_MODE_16_0_0_0:    //  3: In DPU: X16
+#ifdef DPU
+        (controller + X16)->lane_num = 4;
+        (controller + X8)->lane_num = 0;
+        (controller + X4_0)->lane_num = 0;
+        (controller + X4_1)->lane_num = 0;
+
+        (controller + X16)->active = true;
+        (controller + X8)->active = false;
+        (controller + X4_0)->active = false;
+        (controller + X4_1)->active = false;
+
+        (controller + X16)->order = 0;
+        (controller + X8)->order = 0xff;
+        (controller + X4_0)->order = 0xff;
+        (controller + X4_1)->order = 0xff;
+#else
         (controller + X16)->lane_num = 16;
         (controller + X8)->lane_num = 0;
         (controller + X4_0)->lane_num = 0;
@@ -195,6 +256,7 @@ static void subsys_link_init_pre(struct duowen_pcie_subsystem *pcie_subsystem)
         (controller + X8)->order = 0xff;
         (controller + X4_0)->order = 0xff;
         (controller + X4_1)->order = 0xff;
+#endif
         break;
     }
 
@@ -209,12 +271,24 @@ static void subsys_link_init_post(struct duowen_pcie_subsystem *pcie_subsys)
     switch (mode) {
         case LINK_MODE_4_4_4_4:
             write_apb(pcie_subsys->cfg_apb[X4_0], 0xc018010, APB_PORT_X4_0);
+#ifdef DPU
+            break;
+#endif
         case LINK_MODE_8_4_0_4:
             write_apb(pcie_subsys->cfg_apb[X4_1], 0xc018010, APB_PORT_X4_1);
+#ifdef DPU
+            break;
+#endif
         case LINK_MODE_8_8_0_0:
             write_apb(pcie_subsys->cfg_apb[X8], 0xc018010, APB_PORT_X8);
+#ifdef DPU
+            break;
+#endif
         case LINK_MODE_16_0_0_0:
             write_apb(pcie_subsys->cfg_apb[X16], 0xc018010, APB_PORT_X16);
+#ifdef DPU
+            break;
+#endif
         break;
     }
 } 
@@ -226,7 +300,7 @@ void dw_controller_init(struct dw_pcie *pci)
 void instance_subsystem(struct duowen_pcie_subsystem *pcie_subsystem)
 {
     uint8_t i;
-    memset(pcie_subsystem, 0, sizeof(pcie_subsystem));
+    memset(pcie_subsystem, 0, sizeof(*pcie_subsystem));
 
     pcie_subsystem->cfg_apb[X16] = CFG_APB_CORE_X16;
     pcie_subsystem->cfg_apb[X8] = CFG_APB_CORE_X8;
@@ -241,7 +315,7 @@ void instance_subsystem(struct duowen_pcie_subsystem *pcie_subsystem)
         dw_controller_init(pcie_subsystem->controller + i);
 }
 
-void init_duowen_pcie_subsystem(void)
+void pci_platform_init(void)
 {
     struct duowen_pcie_subsystem *pcie_subsys;
     struct dw_pcie *controller;

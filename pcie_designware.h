@@ -1,10 +1,7 @@
 #ifndef _PCIE_DESIGNWARE_H
 #define _PCIE_DESIGNWARE_H
 
-#include "glue.h"
-#include "errno.h"
-#include "pci_regs.h"
-#include <stdint.h>
+#include "pci_glue.h"
 
 /* Parameters for the waiting for link up routine */
 #define LINK_WAIT_MAX_RETRIES		10
@@ -457,16 +454,6 @@ int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
 void dw_pcie_disable_atu(struct dw_pcie *pci, int index,
 			 enum dw_pcie_region_type type);
 void dw_pcie_setup(struct dw_pcie *pci);
-
-//static inline void dw_pcie_writel_atu(struct dw_pcie *pci, uint32_t reg, uint32_t val)
-//{
-//	dw_pcie_write_atu(pci, reg, 0x4, val);
-//}
-
-static inline uint32_t dw_pcie_readl_atu(struct dw_pcie *pci, uint32_t reg)
-{
-	//return dw_pcie_read_atu(pci, reg, 0x4);
-}
 
 static inline void dw_pcie_dbi_ro_wr_en(struct dw_pcie *pci)
 {
