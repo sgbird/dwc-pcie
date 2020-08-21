@@ -14,16 +14,64 @@
 #include <driver/pci_regs.h>
 #include <asm/io.h>
 #else
+#include "cfg.h"
 #include "list.h"
 #include "pci_regs.h"
 #endif
 
-#ifdef SDFIRM
+#ifndef TEST
 #define readl(addr) __raw_readl(addr)
 #define writel(addr, data) __raw_writel(data, addr)
 #else
 static inline void writel(uint32_t addr, uint32_t data){}
 static inline uint32_t readl(uint32_t addr){}
+#endif
+
+#if !defined(SDFIRM) && !defined(TEST)
+static inline void __raw_writeb(uint8_t v, uint32_t a)
+{
+        asm volatile("sb %0, 0(%1)" : : "r"(v), "r"(a));
+}
+static inline void __raw_writew(uint16_t v, uint32_t a)
+{
+        asm volatile("sh %0, 0(%1)" : : "r" (v), "r" (a));
+}
+static inline void __raw_writel(uint32_t v, uint64_t a)
+{
+        asm volatile("sw %0, 0(%1)" : : "r" (v), "r" (a));
+}
+static inline void __raw_writeq(uint32_t v, uint64_t a)
+{
+        asm volatile("sd %0, 0(%1)" : : "r" (v), "r" (a));
+}
+static inline uint8_t __raw_readb(const uint32_t a)
+{
+        uint8_t v;
+
+        asm volatile("lb %0, 0(%1)" : "=r" (v) : "r" (a));
+            return v;
+}
+static inline uint16_t __raw_readw(const uint32_t a)
+{
+        uint16_t v;
+
+        asm volatile("lh %0, 0(%1)" : "=r" (v) : "r" (a));
+            return v;
+}
+static inline uint32_t __raw_readl(const uint64_t a)
+{
+        uint32_t v;
+
+        asm volatile("lw %0, 0(%1)" : "=r" (v) : "r" (a));
+            return v;
+}
+static inline uint32_t __raw_readq(const uint64_t a)
+{
+        uint32_t v;
+
+        asm volatile("ld %0, 0(%1)" : "=r" (v) : "r" (a));
+            return v;
+}
 #endif
 
 #ifdef TEST
@@ -84,5 +132,21 @@ typedef unsigned long size_t;
 #define dev_dbg(dev, fmt, ...)      printf(fmt, ##__VA_ARGS__)
 #define dev_info(dev, fmt, ...)     printf(fmt, ##__VA_ARGS__)
 #define dev_err(dev, fmt, ...)      printf(fmt, ##__VA_ARGS__)
+
+#ifdef STANDALONE
+#define CRCNTL_BASE             ULL(0xFF60000000)
+#define CRCNTL_REG(offset)      (CRCNTL_BASE + (offset))
+#define SW_RST_CFG0             CRCNTL_REG(0x130)    
+
+#define pcie0_aclk              0x5
+#define pcie0_pclk              0x6
+#define pcie0_aux_clk           0x7
+#define pcie0_ref_clk           0x8 
+#define srst_pcie0              0x2 
+#define srst_pcie0_por          0x1
+
+int printf(const char *format, ...);
+void clock_init(void);
+#endif
 
 #endif

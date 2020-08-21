@@ -11,7 +11,7 @@ struct dw_pcie controllers[] =
         .pp.cfg_bar0 = PCIE_CORE_X16_CFG0_START,
         .pp.cfg_bar1 = PCIE_CORE_X16_CFG1_START,
         .pp.cfg_size = PCIE_CORE_CFG_SIZE,
-        .pp.mem_base = PCIE_CORE_X16_ADDR_START,
+        .pp.mem_base = 0,
         .pp.mem_size = PCIE_CORE_MEM_SIZE,
     },
 
@@ -22,7 +22,7 @@ struct dw_pcie controllers[] =
         .pp.cfg_bar0 = PCIE_CORE_X8_CFG0_START,
         .pp.cfg_bar1 = PCIE_CORE_X8_CFG1_START,
         .pp.cfg_size = PCIE_CORE_CFG_SIZE,
-        .pp.mem_base = PCIE_CORE_X8_ADDR_START,
+        .pp.mem_base = 0,
         .pp.mem_size = PCIE_CORE_MEM_SIZE,
     },
 
@@ -33,7 +33,7 @@ struct dw_pcie controllers[] =
         .pp.cfg_bar0 = PCIE_CORE_X4_0_CFG0_START,
         .pp.cfg_bar1 = PCIE_CORE_X4_0_CFG1_START,
         .pp.cfg_size = PCIE_CORE_CFG_SIZE,
-        .pp.mem_base = PCIE_CORE_X4_0_ADDR_START,
+        .pp.mem_base = 0,
         .pp.mem_size = PCIE_CORE_MEM_SIZE,
     },
 
@@ -44,12 +44,12 @@ struct dw_pcie controllers[] =
         .pp.cfg_bar0 = PCIE_CORE_X4_1_CFG0_START,
         .pp.cfg_bar1 = PCIE_CORE_X4_1_CFG1_START,
         .pp.cfg_size = PCIE_CORE_CFG_SIZE,
-        .pp.mem_base = PCIE_CORE_X4_1_ADDR_START,
+        .pp.mem_base = 0,
         .pp.mem_size = PCIE_CORE_MEM_SIZE,
     },
 };
 
-uint32_t read_apb(uint32_t addr, uint8_t port)
+uint32_t read_apb(uint64_t addr, uint8_t port)
 {
     uint32_t data;
 #ifdef IPBENCH
@@ -104,16 +104,27 @@ void reset_init(struct duowen_pcie_subsystem *pcie_subsystem)
 {
     uint64_t base = pcie_subsystem->cfg_apb[SUBSYS];
     uint8_t port = APB_PORT_SUBSYS;
+    uint8_t mode = duowen_get_link_mode(pcie_subsystem);
+    uint32_t data = 0;
 
-    write_apb((base + RESET_PHY), 0x0, port);
-    udelay(1); // 100ns
+    write_apb((base + RESET_PHY), 0x10, port);
+    write_apb((base + SRAM_CONTROL), 0x0, port);
+    write_apb((base + REFCLK_CONTROL), 0x2, port);
+    // #200ns
+    write_apb((base + RESET_PHY), 0xf, port);
+    // #100ns
 
     write_apb((base + RESET_CORE_X16), 0xff, port);
     write_apb((base + RESET_CORE_X8), 0xff, port);
     write_apb((base + RESET_CORE_X4_0), 0xff, port);
     write_apb((base + RESET_CORE_X4_1), 0xff, port);
-
-    write_apb((base + RESET_PHY), 0xff, port);
+#ifndef TEST
+    while ((data & 0xf) != 0xf) {
+        data = read_apb((base + SRAM_STATUS), port);
+    }
+#endif
+    write_apb((base + SRAM_CONTROL), 0x55, port);
+    //write_apb((base + RESET_PHY), 0xff, port);
 }
 
 static void subsys_link_init_pre(struct duowen_pcie_subsystem *pcie_subsystem)
@@ -124,6 +135,9 @@ static void subsys_link_init_pre(struct duowen_pcie_subsystem *pcie_subsystem)
     uint8_t link_mode = pcie_subsystem->link_mode;
 
     //assert(link_mode != LINK_MODE_INVALID);
+
+    // #10ns
+    write_apb((base + SUBSYS_CONTROL), link_mode, port);
 
     switch (link_mode) {
     case LINK_MODE_4_4_4_4:     // 0: In DPU, X4_0
@@ -158,6 +172,8 @@ static void subsys_link_init_pre(struct duowen_pcie_subsystem *pcie_subsystem)
         (controller + X4_0)->order = 2;
         (controller + X4_1)->order = 3;
 #endif
+        base = pcie_subsystem->cfg_apb[X4_0];
+        port = APB_PORT_X4_0;
         break;
     case LINK_MODE_8_4_0_4:     // 1: In DPU, X4_1
 #ifdef DPU
@@ -190,8 +206,10 @@ static void subsys_link_init_pre(struct duowen_pcie_subsystem *pcie_subsystem)
         (controller + X8)->order = 1;
         (controller + X4_0)->order = 0xff;
         (controller + X4_1)->order = 2;
-        break;
 #endif
+        base = pcie_subsystem->cfg_apb[X4_1];
+        port = APB_PORT_X4_1;
+        break;
     case LINK_MODE_8_8_0_0:     // 2: In DPU, X8
 #ifdef DPU
         (controller + X16)->lane_num = 0;
@@ -224,6 +242,8 @@ static void subsys_link_init_pre(struct duowen_pcie_subsystem *pcie_subsystem)
         (controller + X4_0)->order = 0xff;
         (controller + X4_1)->order = 0xff;
 #endif
+        base = pcie_subsystem->cfg_apb[X8];
+        port = APB_PORT_X8;
         break;
     case LINK_MODE_16_0_0_0:    //  3: In DPU: X16
 #ifdef DPU
@@ -257,11 +277,16 @@ static void subsys_link_init_pre(struct duowen_pcie_subsystem *pcie_subsystem)
         (controller + X4_0)->order = 0xff;
         (controller + X4_1)->order = 0xff;
 #endif
+        base = pcie_subsystem->cfg_apb[X16];
+        port = APB_PORT_X16;
         break;
     }
 
-    write_apb((base + SUBSYS_CONTROL), link_mode, port);   
-    udelay(1); // 300ns
+#ifdef CONFIG_DPU_PCIE_ROLE_RC
+    write_apb((base + 0), 0xc810010, port);
+#else
+    write_apb((base + 0), 0xc810000, port);
+#endif
 }
 
 static void subsys_link_init_post(struct duowen_pcie_subsystem *pcie_subsys)
@@ -315,6 +340,21 @@ void instance_subsystem(struct duowen_pcie_subsystem *pcie_subsystem)
         dw_controller_init(pcie_subsystem->controller + i);
 }
 
+#ifndef TEST
+// TODO: 
+void clock_init(void)
+{
+    clk_enable(pcie0_aclk);
+    clk_enable(pcie0_pclk);
+    clk_enable(pcie0_aux_clk);
+    clk_enable(pcie0_ref_clk);
+    //__raw_writel(0x2, 0x401405c);
+
+    clk_enable(srst_pcie0);
+    clk_enable(srst_pcie0_por);
+}
+#endif
+
 void pci_platform_init(void)
 {
     struct duowen_pcie_subsystem *pcie_subsys;
@@ -324,19 +364,32 @@ void pci_platform_init(void)
     pcie_subsys = &pcie_subsystem;
     instance_subsystem(pcie_subsys);
 
-    //clock_init();
-    reset_init(pcie_subsys);
+#ifndef TEST
+    clock_init();
+#endif
     subsys_link_init_pre(pcie_subsys);
+    reset_init(pcie_subsys);
     
     controller = pcie_subsys->controller;
 
     for(i = 0; i < sizeof(controllers)/sizeof(struct dw_pcie); i++) {
         if (controller->active == true) {
             dw_pcie_setup_rc(&(controller->pp));
-            controller++;
         }
+        controller++;
     }
 
     subsys_link_init_post(pcie_subsys);
+    __raw_writeq(0x64646464, (PCIE_SUBSYS_ADDR_START + 0x10));
+
+    uint32_t val;
+    val = __raw_readq((PCIE_SUBSYS_ADDR_START + 0x10));
+    if (val == 0x64646464)
+        printf("MEM64 Read/Write transaction passed\n");
+
+    __raw_writel(0x32323232, (PCIE_SUBSYS_ADDR_START + 0x100));
+    val = __raw_readl((PCIE_SUBSYS_ADDR_START + 0x100));
+    if (val == 0x32323232)
+        printf("MEM32 Read/Write transaction passed\n");
 }
 

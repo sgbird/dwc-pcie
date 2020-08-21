@@ -1,20 +1,49 @@
-CC = gcc
-SRCS = $(wildcard *.c)
-OBJS = $(patsubst %.c, %.o, $(SRCS))
-CFLAGS = -g
+CC = $(PREFIX)gcc
+CFLAGS = -g -O0
 EXTRA_CFLAGS =
-#NAME = $(wildcard *.c)
-BIN = pcie
+EXTRA_LDFLAGS =
+LDSCRIPT = pcie.ld
+ELF = pcie
+STRIP = pcie.strip
+HEX = pcie.hex
+BIN = pcie.bin
+STANDALONE = yes
 
-$(BIN) : $(OBJS)
-	$(CC) -o $@ $^ $(CFLAGS) $(EXTRA_CFLAGS)
+SRCS := $(wildcard *.c)
+ifeq ($(strip $(STANDALONE)), yes)
+SRCS += imc_boot.S
+endif
+TMP := $(patsubst %.c, %.o, $(SRCS))
+TMP += $(patsubst %.S, %.o, $(SRCS))
+OBJS = $(filter %o, $(TMP))
+
+ifeq ($(strip $(STANDALONE)), yes)
+	EXTRA_CFLAGS += -ffreestanding -mcmodel=medany -DSTANDALONE
+	EXTRA_LDFLAGS += -nostdlib -T $(LDSCRIPT)
+endif
+
+$(HEX): $(BIN)
+	./bin2vhx.pl $< $@  --width=64
+
+$(BIN): $(STRIP)
+	$(PREFIX)objcopy -O binary $< $@
+
+$(STRIP): $(ELF)
+	$(PREFIX)strip -R .comment -R .note $< -o $@
+
+$(ELF) : $(OBJS)
+	$(CC) -o $@ $^ $(EXTRA_LDFLAGS)
 
 %.o : %.c
 	$(CC) -o $@ -c $< $(CFLAGS) $(EXTRA_CFLAGS)
 
+%.o : %.S
+	$(CC) -o $@ -c $< $(CFLAGS) $(EXTRA_CFLAGS)
+
 clean:
-	-@rm -fr $(BIN) $(OBJS)
+	-@rm -fr $(HEX) $(BIN) $(STRIP) $(ELF) $(OBJS)
 
 display:
+	@echo SRCS: $(SRCS)
 	@echo OBJS: $(OBJS)
 	@echo TARGET: $(BIN)

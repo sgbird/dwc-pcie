@@ -27,6 +27,9 @@
 #define RESET_CORE_X4_1             0xC
 #define RESET_PHY                   0x10
 #define SUBSYS_CONTROL              0x14
+#define REFCLK_CONTROL              0x18
+#define SRAM_CONTROL                0x1c
+#define SRAM_STATUS                 0x20
 
 #define LINK_MODE_4_4_4_4           0x0
 #define LINK_MODE_8_4_0_4           0x1
@@ -66,15 +69,15 @@
 #define CFG_APB_CORE_X4_0           0xff09003000ULL
 #define CFG_APB_CORE_X4_1           0xff09004000ULL
 
-#define CFG_APB_PHY_0               0xff09100000ULL
-#define CFG_APB_PHY_1               0xff09200000ULL
-#define CFG_APB_PHY_2               0xff09300000ULL
-#define CFG_APB_PHY_3               0xff09400000ULL
+#define CFG_APB_PHY_0               0xff09180000ULL
+#define CFG_APB_PHY_1               0xff09280000ULL
+#define CFG_APB_PHY_2               0xff09380000ULL
+#define CFG_APB_PHY_3               0xff09480000ULL
 
-#define CFG_AXI_CORE_X16            0xff09110000ULL
-#define CFG_AXI_CORE_X8             0xff09210000ULL
-#define CFG_AXI_CORE_X4_0           0xff09310000ULL
-#define CFG_AXI_CORE_X4_1           0xff09410000ULL
+#define CFG_AXI_CORE_X16            0xff09100000ULL
+#define CFG_AXI_CORE_X8             0xff09200000ULL
+#define CFG_AXI_CORE_X4_0           0xff09300000ULL
+#define CFG_AXI_CORE_X4_1           0xff09400000ULL
 #endif
 
 #define KB                          (1UL << 10)
@@ -123,3 +126,5 @@ struct duowen_pcie_subsystem
     //uint32_t (* apb_read)(uint64_t *addr);
     //void (* apb_write)(uint64_t *addr, uint32_t val);
 };
+
+void pci_platform_init(void);
