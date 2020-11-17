@@ -114,6 +114,7 @@ uint32_t dw_pcie_read_dbi(struct dw_pcie *pci, enum dw_pcie_access_type type, ui
         val = readw_dbi(pci, type, reg);
         break;
     case 4:
+    default:
         val = readl_dbi(pci, type, reg);
     }
 

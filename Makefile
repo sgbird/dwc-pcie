@@ -6,12 +6,13 @@ LDSCRIPT = pcie.ld
 ELF = pcie
 STRIP = pcie.strip
 HEX = pcie.hex
+SREC = pcie.srec
 BIN = pcie.bin
 STANDALONE = yes
 
 SRCS := $(wildcard *.c)
 ifeq ($(strip $(STANDALONE)), yes)
-SRCS += imc_boot.S
+#SRCS += imc_boot.S
 endif
 TMP := $(patsubst %.c, %.o, $(SRCS))
 TMP += $(patsubst %.S, %.o, $(SRCS))
@@ -22,11 +23,14 @@ ifeq ($(strip $(STANDALONE)), yes)
 	EXTRA_LDFLAGS += -nostdlib -T $(LDSCRIPT)
 endif
 
-$(HEX): $(BIN)
+$(HEX): $(BIN) $(SREC)
 	./bin2vhx.pl $< $@  --width=64
 
 $(BIN): $(STRIP)
 	$(PREFIX)objcopy -O binary $< $@
+
+$(SREC): $(STRIP)
+	$(PREFIX)objcopy -O srec $< $@
 
 $(STRIP): $(ELF)
 	$(PREFIX)strip -R .comment -R .note $< -o $@
